@@ -15,7 +15,7 @@
 #
 #   This macro calls:
 #
-#     AC_SUBST(BOOST_CPPFLAGS) / AC_SUBST(BOOST_LDFLAGS)
+#     AC_SUBST(BOOST_CPPFLAGS) / AC_SUBST(BOOST_LDFLAGS) / AC_SUBST(BOOST_ROOT)
 #
 #   And sets:
 #
@@ -69,11 +69,13 @@ if test "x$want_boost" = "xyes"; then
 	if test "$ac_boost_path" != ""; then
 		BOOST_LDFLAGS="-L$ac_boost_path/lib"
 		BOOST_CPPFLAGS="-I$ac_boost_path/include"
+		BOOST_ROOT="$ac_boost_path/lib"
 	else
 		for ac_boost_path_tmp in /usr /usr/local /opt /opt/local ; do
 			if test -d "$ac_boost_path_tmp/include/boost" && test -r "$ac_boost_path_tmp/include/boost"; then
 				BOOST_LDFLAGS="-L$ac_boost_path_tmp/lib"
 				BOOST_CPPFLAGS="-I$ac_boost_path_tmp/include"
+				BOOST_ROOT="$ac_boost_path_tmp/lib"
 				break;
 			fi
 		done
@@ -188,6 +190,7 @@ if test "x$want_boost" = "xyes"; then
 	else
 		AC_SUBST(BOOST_CPPFLAGS)
 		AC_SUBST(BOOST_LDFLAGS)
+		AC_SUBST(BOOST_ROOT)
 		AC_DEFINE(HAVE_BOOST,,[define if the Boost library is available])
 	fi
 

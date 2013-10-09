@@ -54,6 +54,7 @@ endif
 # Set libraries external to this component.
 EXTERNAL_LIBS = -L$(thrift_home)/lib -L$(fb303_home)/lib -L$(hadoop_home)/lib -lfb303 -lthrift -lthriftnb
 EXTERNAL_LIBS += -levent -lpthread
+EXTERNAL_STATIC_LIBS = $(BOOST_ROOT)/$(BOOST_SYSTEM_LIB_STATIC) $(BOOST_ROOT)/$(BOOST_FILESYSTEM_LIB_STATIC)
 if USE_SCRIBE_HDFS
   EXTERNAL_LIBS += -lhdfs -ljvm
 endif
@@ -85,7 +86,7 @@ if STATIC
 lib_LIBRARIES = libscribe.a libdynamicbucketupdater.a
 libscribe_a_SOURCES = gen-cpp/scribe.cpp gen-cpp/scribe_types.cpp gen-cpp/scribe_constants.cpp
 libdynamicbucketupdater_a_SOURCES = gen-cpp/BucketStoreMapping.cpp gen-cpp/bucketupdater_constants.cpp gen-cpp/bucketupdater_types.cpp 
-INTERNAL_LIBS = libscribe.a libdynamicbucketupdater.a
+INTERNAL_LIBS = libscribe.a libdynamicbucketupdater.a 
 endif
 
 # Shared -- multiple libraries can be defined
@@ -107,7 +108,7 @@ scribed_SOURCES = store.cpp store_queue.cpp conf.cpp file.cpp conn_pool.cpp scri
 if USE_SCRIBE_HDFS
   scribed_SOURCES += HdfsFile.cpp
 endif
-scribed_LDADD = $(EXTERNAL_LIBS) $(INTERNAL_LIBS)
+scribed_LDADD = $(EXTERNAL_LIBS) $(INTERNAL_LIBS) $(EXTERNAL_STATIC_LIBS)
 
 if SHARED
 scribed_DEPENDENCIES = libscribe.so libdynamicbucketupdater.so
@@ -136,6 +137,7 @@ BUILT_SOURCES = thriftstyle
 
 clean-local: clean-common
 
+$(EXTERNAL_STATIC_LIBS):
 # Add to pre-existing target all:
 #all-local: scribed
 #	@mkdir -p $(top_srcdir)/bin
