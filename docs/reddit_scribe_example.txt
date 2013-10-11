@@ -1,0 +1,168 @@
+#
+# Reddit Scribe Setup Example
+#
+
+# Before you start, read the following docs first
+# https://github.com/facebook/scribe/wiki/Scribe-Overview 
+# https://github.com/facebook/scribe/wiki/Scribe-Configuration
+
+# The following  shows you how to log messages between multiple Scribe instances.a
+# It's a model similar to what we will implement for reddit. 
+# In this example, we will run each Scribe server on a different port to simulate
+# running Scribe on multiple machines. The "client" in practice is the scribe server
+# instance co-located with web/tracking server. The "central" is the scribe server
+# instance that will run on a different machine and buckets the incoming messages 
+# into multiple files. Note that the 'client' is a 'buffer' store which has a 
+# 'primary' setting to send the data over the network and a 'secondary' setting 
+# to spool the data on a temporary file if the network is down. The message will be
+# resent if once the network is backed up.   
+
+          'client'                    'central'
+----------------------------     --------------------
+| Port 1464                 |    | Port 1463         |
+|        ----------------   |    | ----------------  |
+|     -> | scribe server |--|--->| | scribe server | |
+|        ----------------   |    | ----------------  |
+|                |          |    |    |         |    |
+|            temp file      |    |    |    temp file |
+|---------------------------     |-------------------
+                                      |
+                                   -------------------
+                                   | /tmp/scribetest/ |
+                                   -------------------
+# Each scribe log entry consists of two components: category and message. 
+# In the scribe configuration file, you specify how to handle messages by category.
+# If you don't have a configuration for a specific category, the config of categoy 'default' 
+# will be used. 
+
+# You can find a very good scribe client example in examples/scribe_cat where it has the client
+# code you will put in your python code to log the messages.
+
+# Given reddit's scale, I think we definitely want to bucket the log messages. If you setup
+# a bucket store, by default they will hash the first column of the message and modulo it to 
+# a bucket number and write them to different files. Typically people bucket the data by userids
+ 
+
+# Now back to the configuration, the 'client' configuration  is really simple. All it does is to
+# forward the data to another server and buffer the data is the remote server is not available. 
+# Note that in production, the remote_host for the primary setting can be a domain name behind
+# a vips, so the messages can be forward to multiple machines to scale up.  
+
+
+######### 'client' conf start ###########
+
+port=1464
+max_msg_per_second=2000000
+check_interval=3
+
+# DEFAULT - forward all messages to Scribe on port 1463
+<store>
+category=default
+type=buffer
+
+target_write_size=20480
+max_write_interval=1
+buffer_send_rate=1
+retry_interval=30
+retry_interval_range=10
+
+<primary>
+type=network
+remote_host=localhost
+remote_port=1463
+</primary>
+
+<secondary>
+type=file
+fs_type=std
+file_path=/tmp/scribetest2
+base_filename=thisisoverwritten
+max_size=3000000
+</secondary>
+</store>
+
+######### 'client' conf end ###########
+
+
+# The 'central' configuration is more complicated as we want to bucket the data and 
+# rotate the data regularly. In the following example, we will bucket data from 
+# category 'reddit_test' by hashing the first column delimited by ':', modulo by 32 and 
+# append the data into one of the 32 files. The file will also be rotated every 5 minutes. 
+# The non reddit_test category data will be forwarded to the default category
+
+######### 'central' conf start ###########
+
+port=1463
+max_msg_per_second=2000000
+check_interval=3
+
+<store>
+category=reddit_test
+type=bucket
+num_buckets=32
+bucket_subdir=reddit_test
+bucket_type=key_key_modulo
+delimiter=58
+  <bucket>
+    type=file
+    fs_type=std
+    file_path=/tmp/scribetest
+    base_filename=reddit_test
+    use_hostname_sub_directory=yes
+    rotate_period=5m
+  </bucket>
+</store>
+
+<store>
+type=file
+category=default
+file_path=/tmp/scribetest
+</store>
+
+######### 'central' conf end ###########
+
+
+
+# Now let's test things out. Let's create the tmp directories like the following
+mkdir /tmp/scribetest
+mkdir /tmp/scribetest2
+
+# start the scribe servers
+scribed reddit_central.conf 
+scribed reddit_client.conf 
+
+# test is with scribe_cat
+
+# the following eventually writes to /tmp/scribetest/xzy unbucketted
+echo 'hello world' | ~/scribe/examples/scribe_cat -h localhost:1464 xyz
+# the following writes to bucket 0 /tmp/scribetest/reddit_test000/ip-10-232-14-81/
+echo 'hello world' | ./scribe_cat -h localhost:1464 reddit_test
+# the following writes to bucket 003 (hash from '2')
+echo '2:hello world bucket xxsdfdsf' | ~/scribe/examples/scribe_cat -h localhost:1464 reddit_test
+
+
+# Email yunfangjuan@gmail.com for further questions
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
